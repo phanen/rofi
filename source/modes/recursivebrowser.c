@@ -181,128 +181,129 @@ static void scan_dir(FileBrowserModePrivateData *pd, GFile *path) {
   GQueue *dirs_to_scan = g_queue_new();
   g_queue_push_tail(dirs_to_scan, g_object_ref(path));
   GFile *dir_to_scan = NULL;
-  while (  (dir_to_scan = g_queue_pop_head(dirs_to_scan)) != NULL) { 
-	  char *cdir = g_file_get_path(dir_to_scan);
-	  DIR *dir = opendir(cdir);
-	  g_object_unref(dir_to_scan);
-	  if (dir) {
-		  struct dirent *rd = NULL;
-		  while (pd->end_thread == FALSE && (rd = readdir(dir)) != NULL) {
-			  if (g_strcmp0(rd->d_name, "..") == 0) {
-				  continue;
-			  }
-			  if (g_strcmp0(rd->d_name, ".") == 0) {
-				  continue;
-			  }
-			  if (pd->filter_regex &&
-					  g_regex_match(pd->filter_regex, rd->d_name, 0, NULL)) {
-				  continue;
-			  }
-			  switch (rd->d_type) {
-				  case DT_BLK:
-				  case DT_CHR:
-				  case DT_FIFO:
-				  case DT_SOCK:
-				  default:
-					  break;
-				  case DT_REG: {
-								   FBFile *f = g_malloc0(sizeof(FBFile));
-								   // Rofi expects utf-8, so lets convert the filename.
-								   f->path = g_build_filename(cdir, rd->d_name, NULL);
-								   f->name = g_filename_to_utf8(f->path, -1, NULL, NULL, NULL);
-								   if (f->name == NULL) {
-									   f->name = rofi_force_utf8(rd->d_name, -1);
-								   }
-								   if (f->name == NULL) {
-									   f->name = g_strdup("n/a");
-								   }
-								   f->type = (rd->d_type == DT_DIR) ? DIRECTORY : RFILE;
-								   f->icon_fetch_uid = 0;
-								   f->icon_fetch_size = 0;
-								   f->link = FALSE;
+  while ((dir_to_scan = g_queue_pop_head(dirs_to_scan)) != NULL) {
+    char *cdir = g_file_get_path(dir_to_scan);
+    DIR *dir = opendir(cdir);
+    g_object_unref(dir_to_scan);
+    if (dir) {
+      struct dirent *rd = NULL;
+      while (pd->end_thread == FALSE && (rd = readdir(dir)) != NULL) {
+        if (g_strcmp0(rd->d_name, "..") == 0) {
+          continue;
+        }
+        if (g_strcmp0(rd->d_name, ".") == 0) {
+          continue;
+        }
+        if (pd->filter_regex &&
+            g_regex_match(pd->filter_regex, rd->d_name, 0, NULL)) {
+          continue;
+        }
+        switch (rd->d_type) {
+        case DT_BLK:
+        case DT_CHR:
+        case DT_FIFO:
+        case DT_SOCK:
+        default:
+          break;
+        case DT_REG: {
+          FBFile *f = g_malloc0(sizeof(FBFile));
+          // Rofi expects utf-8, so lets convert the filename.
+          f->path = g_build_filename(cdir, rd->d_name, NULL);
+          f->name = g_filename_to_utf8(f->path, -1, NULL, NULL, NULL);
+          if (f->name == NULL) {
+            f->name = rofi_force_utf8(rd->d_name, -1);
+          }
+          if (f->name == NULL) {
+            f->name = g_strdup("n/a");
+          }
+          f->type = (rd->d_type == DT_DIR) ? DIRECTORY : RFILE;
+          f->icon_fetch_uid = 0;
+          f->icon_fetch_size = 0;
+          f->link = FALSE;
 
-								   g_async_queue_push(pd->async_queue, f);
-								   if (g_async_queue_length(pd->async_queue) > 10000) {
-									   write(pd->pipefd2[1], "r", 1);
-								   }
-								   break;
-							   }
-				  case DT_DIR: {
-								   char *d = g_build_filename(cdir, rd->d_name, NULL);
-								   GFile *dirp = g_file_new_for_path(d);
-								   g_queue_push_tail(dirs_to_scan, dirp);
-								   g_free(d);
-								   break;
-							   }
-				  case DT_UNKNOWN:
-				  case DT_LNK: {
-								   FBFile *f = g_malloc0(sizeof(FBFile));
-								   // Rofi expects utf-8, so lets convert the filename.
-								   f->path = g_build_filename(cdir, rd->d_name, NULL);
-								   f->name = g_filename_to_utf8(f->path, -1, NULL, NULL, NULL);
-								   if (f->name == NULL) {
-									   f->name = rofi_force_utf8(rd->d_name, -1);
-								   }
-								   if (f->name == NULL) {
-									   f->name = g_strdup("n/a");
-								   }
-								   f->icon_fetch_uid = 0;
-								   f->icon_fetch_size = 0;
-								   // Default to file.
-								   f->type = RFILE;
-								   if (rd->d_type == DT_LNK) {
-									   f->link = TRUE;
-								   } else {
-									   f->link = FALSE;
-								   }
-								   {
-									   // If we have link, use a stat to fine out what it is, if we fail, we
-									   // mark it as file.
-									   // TODO have a 'broken link' mode?
-									   // Convert full path to right encoding.
-									   // DD: Path should be in file encoding, not utf-8
-									   //          char *file =
-									   //          g_filename_from_utf8(pd->array[pd->array_length].path,
-									   //                                            -1, NULL, NULL, NULL);
-									   // TODO: How to handle loops in links. 
-									   if (f->path) {
-										   GStatBuf statbuf;
-										   if (g_stat(f->path, &statbuf) == 0) {
-											   if (S_ISDIR(statbuf.st_mode)) {
-												   char *new_full_path = g_build_filename(cdir, rd->d_name, NULL);
-												   g_free(f->path);
-												   g_free(f->name);
-												   g_free(f);
-												   f = NULL;
-												   GFile *dirp = g_file_new_for_path(new_full_path);
-												   g_queue_push_tail(dirs_to_scan, dirp);
-												   g_free(new_full_path);
-												   break;
-											   } else if (S_ISREG(statbuf.st_mode)) {
-												   f->type = RFILE;
-											   }
+          g_async_queue_push(pd->async_queue, f);
+          if (g_async_queue_length(pd->async_queue) > 10000) {
+            write(pd->pipefd2[1], "r", 1);
+          }
+          break;
+        }
+        case DT_DIR: {
+          char *d = g_build_filename(cdir, rd->d_name, NULL);
+          GFile *dirp = g_file_new_for_path(d);
+          g_queue_push_tail(dirs_to_scan, dirp);
+          g_free(d);
+          break;
+        }
+        case DT_UNKNOWN:
+        case DT_LNK: {
+          FBFile *f = g_malloc0(sizeof(FBFile));
+          // Rofi expects utf-8, so lets convert the filename.
+          f->path = g_build_filename(cdir, rd->d_name, NULL);
+          f->name = g_filename_to_utf8(f->path, -1, NULL, NULL, NULL);
+          if (f->name == NULL) {
+            f->name = rofi_force_utf8(rd->d_name, -1);
+          }
+          if (f->name == NULL) {
+            f->name = g_strdup("n/a");
+          }
+          f->icon_fetch_uid = 0;
+          f->icon_fetch_size = 0;
+          // Default to file.
+          f->type = RFILE;
+          if (rd->d_type == DT_LNK) {
+            f->link = TRUE;
+          } else {
+            f->link = FALSE;
+          }
+          {
+            // If we have link, use a stat to fine out what it is, if we fail,
+            // we mark it as file.
+            // TODO have a 'broken link' mode?
+            // Convert full path to right encoding.
+            // DD: Path should be in file encoding, not utf-8
+            //          char *file =
+            //          g_filename_from_utf8(pd->array[pd->array_length].path,
+            //                                            -1, NULL, NULL, NULL);
+            // TODO: How to handle loops in links.
+            if (f->path) {
+              GStatBuf statbuf;
+              if (g_stat(f->path, &statbuf) == 0) {
+                if (S_ISDIR(statbuf.st_mode)) {
+                  char *new_full_path =
+                      g_build_filename(cdir, rd->d_name, NULL);
+                  g_free(f->path);
+                  g_free(f->name);
+                  g_free(f);
+                  f = NULL;
+                  GFile *dirp = g_file_new_for_path(new_full_path);
+                  g_queue_push_tail(dirs_to_scan, dirp);
+                  g_free(new_full_path);
+                  break;
+                } else if (S_ISREG(statbuf.st_mode)) {
+                  f->type = RFILE;
+                }
 
-										   } else {
-											   g_warning("Failed to stat file: %s, %s", f->path,
-													   strerror(errno));
-										   }
+              } else {
+                g_warning("Failed to stat file: %s, %s", f->path,
+                          strerror(errno));
+              }
 
-										   //            g_free(file);
-									   }
-								   }
-								   if (f != NULL) {
-									   g_async_queue_push(pd->async_queue, f);
-									   if (g_async_queue_length(pd->async_queue) > 10000) {
-										   write(pd->pipefd2[1], "r", 1);
-									   }
-								   }
-								   break;
-							   }
-			  }
-		  }
-		  closedir(dir);
-	  }
-	  g_free(cdir);
+              //            g_free(file);
+            }
+          }
+          if (f != NULL) {
+            g_async_queue_push(pd->async_queue, f);
+            if (g_async_queue_length(pd->async_queue) > 10000) {
+              write(pd->pipefd2[1], "r", 1);
+            }
+          }
+          break;
+        }
+        }
+      }
+      closedir(dir);
+    }
+    g_free(cdir);
   }
 
   g_queue_free(dirs_to_scan);
@@ -496,11 +497,12 @@ static cairo_surface_t *_get_icon(const Mode *sw, unsigned int selected_line,
   if (rofi_icon_fetcher_file_is_image(dr->path)) {
     dr->icon_fetch_uid = rofi_icon_fetcher_query(dr->path, height);
   } else if (dr->type == RFILE) {
-    gchar* _path = g_strconcat("thumbnail://", dr->path, NULL);
+    gchar *_path = g_strconcat("thumbnail://", dr->path, NULL);
     dr->icon_fetch_uid = rofi_icon_fetcher_query(_path, height);
     g_free(_path);
   } else {
-    dr->icon_fetch_uid = rofi_icon_fetcher_query(rb_icon_name[dr->type], height);
+    dr->icon_fetch_uid =
+        rofi_icon_fetcher_query(rb_icon_name[dr->type], height);
   }
   dr->icon_fetch_size = height;
   return rofi_icon_fetcher_get(dr->icon_fetch_uid);
