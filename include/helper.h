@@ -396,6 +396,9 @@ char *helper_string_replace_if_exists(char *string, ...);
  * @param ext NULL terminated array of file extension passed to option.
  * @param parent_dir The file that was used to import this file, or NULL.
  *
+ * Get the full path to the theme, trying to resolve it over the possible
+ * locations.
+ *
  * @returns path to theme or copy of filename if not found.
  */
 char *helper_get_theme_path(const char *file, const char **ext,

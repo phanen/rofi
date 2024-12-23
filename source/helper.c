@@ -29,6 +29,7 @@
 /** The log domain for this helper. */
 #define G_LOG_DOMAIN "Helper"
 
+#include "helper.h"
 #include "config.h"
 #include "display.h"
 #include "helper-theme.h"

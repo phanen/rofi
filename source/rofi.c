@@ -82,6 +82,8 @@
 char *pidfile = NULL;
 /** Location of Cache directory. */
 const char *cache_dir = NULL;
+/** if the cache_dir string is allocated, keep pointer here so it can be freed.
+ */
 char *cache_dir_alloc = NULL;
 
 /** List of error messages.*/

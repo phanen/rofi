@@ -46,7 +46,9 @@
 #include "xrmoptions.h"
 
 typedef struct {
+  /** array of strings containing key descriptions */
   char **messages;
+  /** lengths of the messages array */
   unsigned int messages_length;
 } KeysHelpModePrivateData;
 
@@ -118,5 +120,5 @@ Mode help_keys_mode = {.name = "keys",
                        ._get_completion = NULL,
                        ._get_display_value = _get_display_value,
                        .private_data = NULL,
-		       .free = NULL,
-		       .type = MODE_TYPE_SWITCHER };
+                       .free = NULL,
+                       .type = MODE_TYPE_SWITCHER};

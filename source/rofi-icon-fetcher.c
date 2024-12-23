@@ -51,9 +51,10 @@
 #include "helper.h"
 #include <gdk-pixbuf/gdk-pixbuf.h>
 
-// thumbnailers key file's group and file extension
+/** Desktop entry specifying the thumbnailer. */
 #define THUMBNAILER_ENTRY_GROUP "Thumbnailer Entry"
-#define THUMBNAILER_EXTENSION   ".thumbnailer"
+/** Extension used for the thumbnailer. */
+#define THUMBNAILER_EXTENSION ".thumbnailer"
 
 typedef struct {
   // Context for icon-themes.
@@ -67,7 +68,7 @@ typedef struct {
   // list extensions
   GList *supported_extensions;
   uint32_t last_uid;
-  
+
   // thumbnailers per mime-types hashmap
   GHashTable *thumbnailers;
 } IconFetcher;
@@ -105,14 +106,14 @@ static void rofi_icon_fetcher_load_thumbnailers(const gchar *path) {
   gchar *thumb_path = g_build_filename(path, "thumbnailers", NULL);
 
   GDir *dir = g_dir_open(thumb_path, 0, NULL);
-  
+
   if (!dir) {
     g_free(thumb_path);
     return;
   }
 
   const gchar *dirent;
-  
+
   while ((dirent = g_dir_read_name(dir))) {
     if (!g_str_has_suffix(dirent, THUMBNAILER_EXTENSION))
       continue;
@@ -125,28 +126,28 @@ static void rofi_icon_fetcher_load_thumbnailers(const gchar *path) {
       g_warning("Error loading thumbnailer %s: %s", filename, error->message);
       g_error_free(error);
     } else {
-      gchar *command = g_key_file_get_string(
-        key_file, THUMBNAILER_ENTRY_GROUP, "Exec", NULL);
+      gchar *command = g_key_file_get_string(key_file, THUMBNAILER_ENTRY_GROUP,
+                                             "Exec", NULL);
       gchar **mime_types = g_key_file_get_string_list(
-        key_file, THUMBNAILER_ENTRY_GROUP, "MimeType", NULL, NULL);
+          key_file, THUMBNAILER_ENTRY_GROUP, "MimeType", NULL, NULL);
 
       if (mime_types && command) {
         guint i;
         for (i = 0; mime_types[i] != NULL; i++) {
-          if (!g_hash_table_lookup(
-              rofi_icon_fetcher_data->thumbnailers, mime_types[i])) {
-            g_info("Loading thumbnailer %s for mimetype %s", filename, mime_types[i]);
-            g_hash_table_insert(
-              rofi_icon_fetcher_data->thumbnailers,
-              g_strdup(mime_types[i]),
-              g_strdup(command)
-            );
+          if (!g_hash_table_lookup(rofi_icon_fetcher_data->thumbnailers,
+                                   mime_types[i])) {
+            g_info("Loading thumbnailer %s for mimetype %s", filename,
+                   mime_types[i]);
+            g_hash_table_insert(rofi_icon_fetcher_data->thumbnailers,
+                                g_strdup(mime_types[i]), g_strdup(command));
           }
         }
       }
 
-      if (mime_types) g_strfreev(mime_types);
-      if (command) g_free(command);
+      if (mime_types)
+        g_strfreev(mime_types);
+      if (command)
+        g_free(command);
     }
 
     g_key_file_free(key_file);
@@ -157,26 +158,25 @@ static void rofi_icon_fetcher_load_thumbnailers(const gchar *path) {
   g_free(thumb_path);
 }
 
-static gchar** setup_thumbnailer_command(const gchar *command,
+static gchar **setup_thumbnailer_command(const gchar *command,
                                          const gchar *filename,
                                          const gchar *encoded_uri,
-                                         const gchar *output_path,
-                                         int size) {
+                                         const gchar *output_path, int size) {
   gchar **command_parts = g_strsplit(command, " ", 0);
   guint command_parts_count = g_strv_length(command_parts);
-  
-  gchar **command_args = NULL; 
-  
+
+  gchar **command_args = NULL;
+
   if (command_parts) {
-    command_args = g_malloc0(sizeof(gchar*) * (command_parts_count + 3 + 1));
-    
+    command_args = g_malloc0(sizeof(gchar *) * (command_parts_count + 3 + 1));
+
     // set process niceness value to 19 (low priority)
     guint current_index = 0;
-    
+
     command_args[current_index++] = g_strdup("nice");
     command_args[current_index++] = g_strdup("-n");
     command_args[current_index++] = g_strdup("19");
-    
+
     // add executable and arguments of the thumbnailer to the list
     guint i;
     for (i = 0; command_parts[i] != NULL; i++) {
@@ -197,7 +197,7 @@ static gchar** setup_thumbnailer_command(const gchar *command,
 
     g_strfreev(command_parts);
   }
-  
+
   return command_args;
 }
 
@@ -206,8 +206,9 @@ static gboolean exec_thumbnailer_command(gchar **command_args) {
   gint wait_status;
   GError *error = NULL;
 
-  gboolean spawned = g_spawn_sync(NULL, command_args,
-    NULL, G_SPAWN_DEFAULT | G_SPAWN_SEARCH_PATH, NULL, NULL, NULL, NULL, &wait_status, &error);
+  gboolean spawned = g_spawn_sync(NULL, command_args, NULL,
+                                  G_SPAWN_DEFAULT | G_SPAWN_SEARCH_PATH, NULL,
+                                  NULL, NULL, NULL, &wait_status, &error);
 
   if (spawned) {
     return g_spawn_check_wait_status(wait_status, NULL);
@@ -226,22 +227,22 @@ static gboolean rofi_icon_fetcher_create_thumbnail(const gchar *mime_type,
                                                    int size) {
   gboolean thumbnail_created = FALSE;
 
-  gchar *command = g_hash_table_lookup(
-    rofi_icon_fetcher_data->thumbnailers, mime_type);
+  gchar *command =
+      g_hash_table_lookup(rofi_icon_fetcher_data->thumbnailers, mime_type);
 
   if (!command) {
     return thumbnail_created;
   }
 
-  // split command string to isolate arguments and expand them in a list  
+  // split command string to isolate arguments and expand them in a list
   gchar **command_args = setup_thumbnailer_command(
-    command, filename, encoded_uri, output_path, size);
-  
+      command, filename, encoded_uri, output_path, size);
+
   if (command_args) {
-    thumbnail_created = exec_thumbnailer_command(command_args);    
+    thumbnail_created = exec_thumbnailer_command(command_args);
     g_strfreev(command_args);
   }
-  
+
   return thumbnail_created;
 }
 
@@ -301,19 +302,19 @@ void rofi_icon_fetcher_init(void) {
     g_free(exts);
   }
   g_slist_free(l);
-  
+
   // load available thumbnailers from system dirs and user dir
   rofi_icon_fetcher_data->thumbnailers = g_hash_table_new_full(
-    g_str_hash, g_str_equal, (GDestroyNotify)g_free, (GDestroyNotify)g_free);
+      g_str_hash, g_str_equal, (GDestroyNotify)g_free, (GDestroyNotify)g_free);
 
-  const gchar * const *system_data_dirs = g_get_system_data_dirs();
+  const gchar *const *system_data_dirs = g_get_system_data_dirs();
   const gchar *user_data_dir = g_get_user_data_dir();
 
   rofi_icon_fetcher_load_thumbnailers(user_data_dir);
 
   guint i;
   for (i = 0; system_data_dirs[i] != NULL; i++) {
-      rofi_icon_fetcher_load_thumbnailers(system_data_dirs[i]);
+    rofi_icon_fetcher_load_thumbnailers(system_data_dirs[i]);
   }
 }
 
@@ -325,7 +326,7 @@ void rofi_icon_fetcher_destroy(void) {
   if (rofi_icon_fetcher_data == NULL) {
     return;
   }
-  
+
   g_hash_table_unref(rofi_icon_fetcher_data->thumbnailers);
 
   nk_xdg_theme_context_free(rofi_icon_fetcher_data->xdg_context);
@@ -459,39 +460,38 @@ gboolean rofi_icon_fetcher_file_is_image(const char *const path) {
 }
 
 // build thumbnail's path using md5 hash of an entry name
-static gchar* rofi_icon_fetcher_get_thumbnail(gchar* name, 
-                                              int requested_size, 
+static gchar *rofi_icon_fetcher_get_thumbnail(gchar *name, int requested_size,
                                               int *thumb_size) {
   // calc entry_name md5 hash
-  GChecksum* checksum = g_checksum_new(G_CHECKSUM_MD5);
-  g_checksum_update(checksum, (guchar*)name, -1);
+  GChecksum *checksum = g_checksum_new(G_CHECKSUM_MD5);
+  g_checksum_update(checksum, (guchar *)name, -1);
   const gchar *md5_hex = g_checksum_get_string(checksum);
 
   // determine thumbnail folder based on the request size
-  const gchar* cache_dir = g_get_user_cache_dir();
-  gchar* thumb_dir;
-  gchar* thumb_path;
+  const gchar *cache_dir = g_get_user_cache_dir();
+  gchar *thumb_dir;
+  gchar *thumb_path;
 
   if (requested_size <= 128) {
     *thumb_size = 128;
     thumb_dir = g_strconcat(cache_dir, "/thumbnails/normal/", NULL);
-    thumb_path = g_strconcat(cache_dir, "/thumbnails/normal/",
-        md5_hex, ".png", NULL);
+    thumb_path =
+        g_strconcat(cache_dir, "/thumbnails/normal/", md5_hex, ".png", NULL);
   } else if (requested_size <= 256) {
     *thumb_size = 256;
     thumb_dir = g_strconcat(cache_dir, "/thumbnails/large/", NULL);
-    thumb_path = g_strconcat(cache_dir, "/thumbnails/large/",
-        md5_hex, ".png", NULL);
+    thumb_path =
+        g_strconcat(cache_dir, "/thumbnails/large/", md5_hex, ".png", NULL);
   } else if (requested_size <= 512) {
     *thumb_size = 512;
     thumb_dir = g_strconcat(cache_dir, "/thumbnails/x-large/", NULL);
-    thumb_path = g_strconcat(cache_dir, "/thumbnails/x-large/",
-        md5_hex, ".png", NULL);
+    thumb_path =
+        g_strconcat(cache_dir, "/thumbnails/x-large/", md5_hex, ".png", NULL);
   } else {
     *thumb_size = 1024;
     thumb_dir = g_strconcat(cache_dir, "/thumbnails/xx-large/", NULL);
-    thumb_path = g_strconcat(cache_dir, "/thumbnails/xx-large/",
-        md5_hex, ".png", NULL);
+    thumb_path =
+        g_strconcat(cache_dir, "/thumbnails/xx-large/", md5_hex, ".png", NULL);
   }
 
   // create thumbnail directory if it does not exist
@@ -504,24 +504,24 @@ static gchar* rofi_icon_fetcher_get_thumbnail(gchar* name,
 }
 
 // retrieves icon key from a .desktop file
-static gchar* rofi_icon_fetcher_get_desktop_icon(const gchar* file_path) {
+static gchar *rofi_icon_fetcher_get_desktop_icon(const gchar *file_path) {
   GKeyFile *kf = g_key_file_new();
   GError *key_error = NULL;
   gchar *icon_key = NULL;
-  
+
   gboolean res = g_key_file_load_from_file(kf, file_path, 0, &key_error);
-  
+
   if (res) {
     icon_key = g_key_file_get_string(kf, "Desktop Entry", "Icon", NULL);
   } else {
-    g_debug("Failed to parse desktop file %s because: %s.",
-        file_path, key_error->message);
-    
+    g_debug("Failed to parse desktop file %s because: %s.", file_path,
+            key_error->message);
+
     g_error_free(key_error);
   }
-  
+
   g_key_file_free(kf);
-  
+
   return icon_key;
 }
 
@@ -539,13 +539,13 @@ static void rofi_icon_fetcher_worker(thread_state *sdata,
   if (g_str_has_prefix(sentry->entry->name, "thumbnail://")) {
     // remove uri thumbnail prefix from entry name
     gchar *entry_name = &sentry->entry->name[12];
-    
+
     if (strcmp(entry_name, "") == 0) {
       sentry->query_done = TRUE;
       rofi_view_reload();
       return;
     }
-    
+
     // use custom user command to generate the thumbnail
     if (config.preview_cmd != NULL) {
       int requested_size = MAX(sentry->wsize, sentry->hsize);
@@ -553,19 +553,18 @@ static void rofi_icon_fetcher_worker(thread_state *sdata,
 
       icon_path = icon_path_ = rofi_icon_fetcher_get_thumbnail(
           entry_name, requested_size, &thumb_size);
-      
+
       if (!g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
         char **command_args = NULL;
         int argsv = 0;
         gchar *size_str = g_strdup_printf("%d", thumb_size);
-        
-        helper_parse_setup(
-          config.preview_cmd, &command_args, &argsv,
-          "{input}", entry_name,
-          "{output}", icon_path_, "{size}", size_str, NULL);
+
+        helper_parse_setup(config.preview_cmd, &command_args, &argsv, "{input}",
+                           entry_name, "{output}", icon_path_, "{size}",
+                           size_str, NULL);
 
         g_free(size_str);
-        
+
         if (command_args) {
           exec_thumbnailer_command(command_args);
           g_strfreev(command_args);
@@ -576,13 +575,13 @@ static void rofi_icon_fetcher_worker(thread_state *sdata,
       if (g_str_has_suffix(entry_name, ".desktop")) {
         // if the entry is a .desktop file try to read its icon key
         gchar *icon_key = rofi_icon_fetcher_get_desktop_icon(entry_name);
-        
+
         if (icon_key == NULL || strlen(icon_key) == 0) {
           // no icon in .desktop file, fallback on mimetype icon (text/plain)
           icon_path = icon_path_ = nk_xdg_theme_get_icon(
-            rofi_icon_fetcher_data->xdg_context, themes, NULL, "text-plain",
-            MIN(sentry->wsize, sentry->hsize), 1, TRUE);
-          
+              rofi_icon_fetcher_data->xdg_context, themes, NULL, "text-plain",
+              MIN(sentry->wsize, sentry->hsize), 1, TRUE);
+
           g_free(icon_key);
         } else if (g_path_is_absolute(icon_key)) {
           // icon in .desktop file is an absolute path to an image
@@ -590,9 +589,9 @@ static void rofi_icon_fetcher_worker(thread_state *sdata,
         } else {
           // icon in .desktop file is a standard icon name
           icon_path = icon_path_ = nk_xdg_theme_get_icon(
-            rofi_icon_fetcher_data->xdg_context, themes, NULL, icon_key,
-            MIN(sentry->wsize, sentry->hsize), 1, TRUE);
-          
+              rofi_icon_fetcher_data->xdg_context, themes, NULL, icon_key,
+              MIN(sentry->wsize, sentry->hsize), 1, TRUE);
+
           g_free(icon_key);
         }
       } else {
@@ -603,40 +602,40 @@ static void rofi_icon_fetcher_worker(thread_state *sdata,
 
         // look for file thumbnail in appropriate folder based on requested size
         icon_path = icon_path_ = rofi_icon_fetcher_get_thumbnail(
-          encoded_uri, requested_size, &thumb_size);
+            encoded_uri, requested_size, &thumb_size);
 
         if (!g_file_test(icon_path, G_FILE_TEST_EXISTS)) {
           // try to generate thumbnail
           char *content_type = g_content_type_guess(entry_name, NULL, 0, NULL);
           char *mime_type = g_content_type_get_mime_type(content_type);
-          
+
           if (mime_type) {
             gboolean created = rofi_icon_fetcher_create_thumbnail(
-              mime_type, entry_name, encoded_uri, icon_path_, thumb_size);
+                mime_type, entry_name, encoded_uri, icon_path_, thumb_size);
 
             if (!created) {
               // replace forward slashes with minus sign to get the icon's name
               int index = 0;
 
-              while(mime_type[index]) {
-                 if(mime_type[index] == '/')
-                    mime_type[index] = '-';
-                 index++;
+              while (mime_type[index]) {
+                if (mime_type[index] == '/')
+                  mime_type[index] = '-';
+                index++;
               }
-              
+
               g_free(icon_path_);
 
               // try to fetch the mime-type icon
               icon_path = icon_path_ = nk_xdg_theme_get_icon(
-                rofi_icon_fetcher_data->xdg_context, themes, NULL, mime_type,
-                MIN(sentry->wsize, sentry->hsize), 1, TRUE);
+                  rofi_icon_fetcher_data->xdg_context, themes, NULL, mime_type,
+                  MIN(sentry->wsize, sentry->hsize), 1, TRUE);
             }
-            
+
             g_free(mime_type);
             g_free(content_type);
           }
         }
-        
+
         g_free(encoded_uri);
       }
     }
