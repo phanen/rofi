@@ -598,10 +598,12 @@ static int dmenu_mode_init(Mode *sw) {
     config.location = 6;
   }
   /* -i case insensitive */
-  config.case_sensitive = TRUE;
+  /* +i case sensitive */
+  config.case_sensitive = CASE_SMART;
   if (find_arg("-i") >= 0) {
-    config.case_sensitive = FALSE;
+    config.case_sensitive = CASE_INSENSITIVE;
   }
+
   if (pd->async) {
     pd->fd = STDIN_FILENO;
     if (find_arg_str("-input", &str)) {
@@ -954,7 +956,8 @@ int dmenu_mode_dialog(void) {
   char *select = NULL;
   find_arg_str("-select", &select);
   if (select != NULL) {
-    rofi_int_matcher **tokens = helper_tokenize(select, config.case_sensitive);
+    int case_sensitive = parse_case_sensitivity(select);
+    rofi_int_matcher **tokens = helper_tokenize(select, case_sensitive);
     unsigned int i = 0;
     for (i = 0; i < cmd_list_length; i++) {
       if (helper_token_match(tokens, cmd_list[i].entry)) {
@@ -965,8 +968,9 @@ int dmenu_mode_dialog(void) {
     helper_tokenize_free(tokens);
   }
   if (find_arg("-dump") >= 0) {
-    rofi_int_matcher **tokens = helper_tokenize(
-        config.filter ? config.filter : "", config.case_sensitive);
+    char *filter = config.filter ? config.filter : "";
+    rofi_int_matcher **tokens =
+        helper_tokenize(filter, parse_case_sensitivity(filter));
     unsigned int i = 0;
     for (i = 0; i < cmd_list_length; i++) {
       if (tokens == NULL || helper_token_match(tokens, cmd_list[i].entry)) {

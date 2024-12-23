@@ -188,8 +188,8 @@ void rofi_view_get_current_monitor(int *width, int *height) {
     *height = CacheState.mon.h;
   }
 }
-static char *get_matching_state(void) {
-  if (config.case_sensitive) {
+static char *get_matching_state(RofiViewState *state) {
+  if (state->text->case_sensitive) {
     if (config.sort) {
       return "±";
     }
@@ -762,12 +762,13 @@ static void filter_elements(thread_state *ts,
         glong slen = g_utf8_strlen(str, -1);
         switch (config.sorting_method_enum) {
         case SORT_FZF:
-          t->state->distance[i] =
-              rofi_scorer_fuzzy_evaluate(t->pattern, t->plen, str, slen);
+          t->state->distance[i] = rofi_scorer_fuzzy_evaluate(
+              t->pattern, t->plen, str, slen, t->state->text->case_sensitive);
           break;
         case SORT_NORMAL:
         default:
-          t->state->distance[i] = levenshtein(t->pattern, t->plen, str, slen);
+          t->state->distance[i] = levenshtein(t->pattern, t->plen, str, slen,
+                                              t->state->text->case_sensitive);
           break;
         }
         g_free(str);
@@ -1445,11 +1446,12 @@ static gboolean rofi_view_refilter_real(RofiViewState *state) {
   TICK_N("Filter tokenize");
   if (state->text && strlen(state->text->text) > 0) {
 
+    state->text->case_sensitive = parse_case_sensitivity(state->text->text);
     listview_set_filtered(state->list_view, TRUE);
     unsigned int j = 0;
     gchar *pattern = mode_preprocess_input(state->sw, state->text->text);
     glong plen = pattern ? g_utf8_strlen(pattern, -1) : 0;
-    state->tokens = helper_tokenize(pattern, config.case_sensitive);
+    state->tokens = helper_tokenize(pattern, state->text->case_sensitive);
     /**
      * On long lists it can be beneficial to parallelize.
      * If number of threads is 1, no thread is spawn.
@@ -1478,7 +1480,7 @@ static gboolean rofi_view_refilter_real(RofiViewState *state) {
       states[i].acount = &count;
       states[i].plen = plen;
       states[i].pattern = pattern;
-      states[i].st.callback = filter_elements;
+      states[i].st.callback = filter_elements; // here
       states[i].st.free = NULL;
       states[i].st.priority = G_PRIORITY_HIGH;
       if (i > 0) {
@@ -1676,7 +1678,7 @@ static void rofi_view_trigger_global_action(KeyBindingAction action) {
     if (state->case_indicator != NULL) {
       config.sort = !config.sort;
       state->refilter = TRUE;
-      textbox_text(state->case_indicator, get_matching_state());
+      textbox_text(state->case_indicator, get_matching_state(state));
     }
     break;
   case MODE_PREVIOUS:
@@ -1703,10 +1705,13 @@ static void rofi_view_trigger_global_action(KeyBindingAction action) {
   // Toggle case sensitivity.
   case TOGGLE_CASE_SENSITIVITY:
     if (state->case_indicator != NULL) {
-      config.case_sensitive = !config.case_sensitive;
+      if (config.case_sensitive == CASE_SENSITIVE)
+        config.case_sensitive = CASE_INSENSITIVE;
+      else
+        config.case_sensitive = CASE_SENSITIVE;
       (state->selected_line) = 0;
       state->refilter = TRUE;
-      textbox_text(state->case_indicator, get_matching_state());
+      textbox_text(state->case_indicator, get_matching_state(state));
     }
     break;
   // Special delete entry command.
@@ -2330,7 +2335,7 @@ static void rofi_view_add_widget(RofiViewState *state, widget *parent_widget,
                        TB_AUTOWIDTH | TB_AUTOHEIGHT, NORMAL, "*", 0, 0);
     // Add small separator between case indicator and text box.
     box_add((box *)parent_widget, WIDGET(state->case_indicator), FALSE);
-    textbox_text(state->case_indicator, get_matching_state());
+    textbox_text(state->case_indicator, get_matching_state(state));
   }
   /**
    * ENTRY BOX
