@@ -220,6 +220,8 @@ static void run_mode_index(ModeMode mode) {
   curr_mode = mode;
   RofiViewState *state =
       rofi_view_create(modes[mode], config.filter, 0, process_result);
+  // fprintf(stderr, "DEBUGPRINT[44]: rofi.c:220: filter=%s\n", config.filter);
+  // return;
 
   // User can pre-select a row.
   if (find_arg("-selected-row") >= 0) {

@@ -69,6 +69,7 @@ typedef struct {
   int tbft;
   int markup;
   int changed;
+  int case_sensitive;
 
   int blink;
   guint blink_timeout;

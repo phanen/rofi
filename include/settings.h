@@ -48,6 +48,12 @@ typedef enum {
  */
 typedef enum { SORT_NORMAL = 0, SORT_FZF = 1 } SortingMethod;
 
+typedef enum {
+  CASE_SMART = 0,
+  CASE_INSENSITIVE = 1,
+  CASE_SENSITIVE = 2,
+} Case;
+
 /**
  * Settings structure holding all (static) configurable options.
  * @ingroup CONFIGURATION
@@ -114,7 +120,8 @@ typedef struct {
   char *drun_url_launcher;
 
   /** Search case sensitivity */
-  unsigned int case_sensitive;
+  Case case_sensitive;
+
   /** Cycle through in the element list */
   unsigned int cycle;
   /** Height of an element in number of rows */

@@ -91,7 +91,7 @@ Settings config = {
     /** Use levenshtein sorting when matching */
     .sorting_method = "normal",
     /** Case sensitivity of the search */
-    .case_sensitive = FALSE,
+    .case_sensitive = CASE_SMART,
     /** Cycle through in the element list */
     .cycle = TRUE,
     /** Height of an element in #chars */
