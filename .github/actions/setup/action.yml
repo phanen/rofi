@@ -33,7 +33,7 @@ runs:
           libxkbcommon-dev \
           libxkbcommon-dev \
           libxkbcommon-x11-dev \
-          libgdk-pixbuf-2.0 \
+          libgdk-pixbuf-2.0-dev \
           ninja-build \
           pandoc \
           python3-pip \
