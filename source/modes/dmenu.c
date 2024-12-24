@@ -968,8 +968,9 @@ int dmenu_mode_dialog(void) {
     helper_tokenize_free(tokens);
   }
   if (find_arg("-dump") >= 0) {
-    char* filter = config.filter ? config.filter : "";
-    rofi_int_matcher **tokens = helper_tokenize(filter, parse_case_sensitivity(filter));
+    char *filter = config.filter ? config.filter : "";
+    rofi_int_matcher **tokens =
+        helper_tokenize(filter, parse_case_sensitivity(filter));
     unsigned int i = 0;
     for (i = 0; i < cmd_list_length; i++) {
       if (tokens == NULL || helper_token_match(tokens, cmd_list[i].entry)) {
