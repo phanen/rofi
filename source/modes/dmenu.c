@@ -1032,7 +1032,6 @@ void print_dmenu_options(void) {
   print_help_msg("-window-title", "[string] ", "Set the dmenu window title",
                  NULL, is_term);
   print_help_msg("-i", "", "Set filter to be case insensitive", NULL, is_term);
-  print_help_msg("+i", "", "Set filter to be case sensitive", NULL, is_term);
   print_help_msg("-only-match", "",
                  "Force selection to be given entry, disallow no match", NULL,
                  is_term);
