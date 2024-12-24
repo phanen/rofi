@@ -602,8 +602,6 @@ static int dmenu_mode_init(Mode *sw) {
   config.case_sensitive = CASE_SMART;
   if (find_arg("-i") >= 0) {
     config.case_sensitive = CASE_INSENSITIVE;
-  } else if (find_arg("+i") >= 0) {
-    config.case_sensitive = CASE_SENSITIVE;
   }
 
   if (pd->async) {
